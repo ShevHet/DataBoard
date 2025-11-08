@@ -1,25 +1,14 @@
-/**
- * Очередь с дедупликацией и батчингом
- */
 import { appendItems, markSelectionForUpdate, commitSelectionUpdate, getPendingSelectionUpdate, getSelection } from './memoryStore.js';
 
-// Очередь для добавления элементов
 let addQueue = new Set();
-// Таймер для обработки очереди добавления (каждые 10 секунд)
 let addBatchInterval = null;
-// Таймер для коммита изменений состояния (каждую 1 секунду)
 let commitInterval = null;
 
-/**
- * Инициализация таймеров батчинга
- */
 export function initializeBatching() {
-  // Батчинг добавления: каждые 10 секунд
   addBatchInterval = setInterval(() => {
     processAddQueue();
   }, 10000);
 
-  // Батчинг коммита изменений: каждую 1 секунду
   commitInterval = setInterval(() => {
     commitStateChanges();
   }, 1000);
@@ -27,9 +16,6 @@ export function initializeBatching() {
   console.log('Очередь инициализирована: батчинг добавления (10 сек), коммит изменений (1 сек)');
 }
 
-/**
- * Остановка таймеров батчинга
- */
 export function stopBatching() {
   if (addBatchInterval) {
     clearInterval(addBatchInterval);
@@ -41,11 +27,6 @@ export function stopBatching() {
   }
 }
 
-/**
- * Добавить ID в очередь с дедупликацией
- * @param {number[]} ids - Массив ID для добавления
- * @returns {number[]} - Массив принятых ID (после дедупликации)
- */
 export function enqueueAdd(ids) {
   const accepted = [];
   const skipped = [];
@@ -72,9 +53,6 @@ export function enqueueAdd(ids) {
   return accepted;
 }
 
-/**
- * Обработать очередь добавления (вызывается каждые 10 секунд)
- */
 function processAddQueue() {
   if (addQueue.size === 0) {
     return;
@@ -92,9 +70,6 @@ function processAddQueue() {
   markSelectionForUpdate(newSelectedIds, newOrder);
 }
 
-/**
- * Коммит изменений состояния (вызывается каждую 1 секунду)
- */
 function commitStateChanges() {
   const pending = getPendingSelectionUpdate();
   
@@ -104,19 +79,10 @@ function commitStateChanges() {
   }
 }
 
-/**
- * Пометить selection для обновления в следующем коммите
- * @param {number[]} selectedIds - Новый список выбранных ID
- * @param {number[]} order - Новый порядок ID
- */
 export function updateSelection(selectedIds, order) {
   markSelectionForUpdate(selectedIds, order);
 }
 
-/**
- * Получить текущий размер очереди (для отладки)
- * @returns {number}
- */
 export function getQueueSize() {
   return addQueue.size;
 }

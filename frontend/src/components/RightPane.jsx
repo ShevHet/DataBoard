@@ -15,13 +15,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { getSelection, updateSelection, getItemsByIds } from '../api';
+import { getSelection, updateSelection, getItemsByIds, removeFromSelection } from '../api';
 import { selectionEqual, itemsEqual } from '../utils/shallowCompare';
 
-/**
- * Sortable элемент
- */
-const SortableItem = ({ id, item }) => {
+const SortableItem = ({ id, item, onRemove }) => {
   const {
     attributes,
     listeners,
@@ -38,8 +35,15 @@ const SortableItem = ({ id, item }) => {
     marginBottom: '10px',
   };
 
+  const handleRemoveClick = (e) => {
+    e.stopPropagation();
+    if (onRemove) {
+      onRemove(id);
+    }
+  };
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style}>
       <div
         style={{
           display: 'flex',
@@ -51,23 +55,46 @@ const SortableItem = ({ id, item }) => {
           cursor: isDragging ? 'grabbing' : 'grab',
         }}
       >
-        <div style={{ flex: 1 }}>
-          <strong>ID: {item.id}</strong>
-          {item.createdAt && (
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-              {new Date(item.createdAt).toLocaleString()}
-            </div>
-          )}
+        <div {...attributes} {...listeners} style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+          <div style={{ flex: 1 }}>
+            <strong>ID: {item.id}</strong>
+            {item.createdAt && (
+              <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                {new Date(item.createdAt).toLocaleString()}
+              </div>
+            )}
+          </div>
+          <div style={{ marginLeft: '10px', color: '#999', fontSize: '20px' }}>⋮⋮</div>
         </div>
-        <div style={{ marginLeft: '10px', color: '#999', fontSize: '20px' }}>⋮⋮</div>
+        <button
+          onClick={handleRemoveClick}
+          aria-label="Удалить"
+          style={{
+            marginLeft: '10px',
+            padding: '5px 10px',
+            backgroundColor: '#ff4444',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            lineHeight: '1',
+            fontWeight: 'bold',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = '#cc0000';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = '#ff4444';
+          }}
+        >
+          ✖
+        </button>
       </div>
     </div>
   );
 };
 
-/**
- * Правая панель: выбранные элементы с drag & drop
- */
 const RightPane = () => {
   const [selection, setSelection] = useState({
     selectedIds: [],
@@ -76,6 +103,7 @@ const RightPane = () => {
   const [items, setItems] = useState([]);
   const [updating, setUpdating] = useState(false);
   const [filterId, setFilterId] = useState('');
+  const [toast, setToast] = useState(null);
   const pollingIntervalRef = useRef(null);
 
   const LIMIT = 20;
@@ -87,7 +115,6 @@ const RightPane = () => {
     })
   );
 
-  // Загрузка данных элементов по ID
   const loadItemsData = useCallback(async (idsToLoad, append = false) => {
     try {
       const ids = idsToLoad;
@@ -98,7 +125,6 @@ const RightPane = () => {
         return;
       }
 
-      // Определяем, сколько элементов уже загружено
       const currentItems = append ? items : [];
       const loadedIds = new Set(currentItems.map(item => item.id));
       const remainingIds = ids.filter(id => !loadedIds.has(id));
@@ -143,7 +169,6 @@ const RightPane = () => {
     }
   }, [items]);
 
-  // Загрузка selection с сервера
   const loadSelection = useCallback(async () => {
     try {
       const data = await getSelection();
@@ -172,7 +197,6 @@ const RightPane = () => {
     }
   }, [items, loadItemsData]);
 
-  // Polling: опрос сервера каждую секунду
   useEffect(() => {
     loadSelection();
 
@@ -189,7 +213,40 @@ const RightPane = () => {
   }, [loadSelection]);
 
 
-  // Обработка drag & drop
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
+
+  const handleRemove = async (id) => {
+    try {
+      setUpdating(true);
+      const response = await removeFromSelection([id]);
+      
+      if (response.ok) {
+        if (response.removed && response.removed.length > 0) {
+          setSelection({
+            selectedIds: response.selectedIds,
+            order: response.order,
+          });
+          
+          setItems(prevItems => prevItems.filter(item => item.id !== id));
+          
+          showToast('Элемент удалён', 'success');
+        } else {
+          showToast('Ничего не удалено', 'warning');
+        }
+      }
+    } catch (error) {
+      console.error('Error removing item:', error);
+      showToast('Ошибка при удалении', 'error');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handleDragEnd = async (event) => {
     const { active, over } = event;
 
@@ -241,7 +298,6 @@ const RightPane = () => {
     }
   };
 
-  // Подгрузка элементов при скролле
   const handleScroll = useCallback((e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100;
@@ -266,7 +322,6 @@ const RightPane = () => {
     }}>
       <h2>Выбранные элементы ({selection.selectedIds.length})</h2>
       
-      {/* Фильтр */}
       <div style={{ marginBottom: '20px' }}>
         <input
           type="text"
@@ -295,6 +350,26 @@ const RightPane = () => {
         </div>
       )}
 
+      {toast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            padding: '12px 20px',
+            backgroundColor: toast.type === 'error' ? '#ff4444' : toast.type === 'success' ? '#4caf50' : '#2196f3',
+            color: 'white',
+            borderRadius: '4px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            zIndex: 1000,
+            fontSize: '14px',
+            fontWeight: '500',
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
+
       {displayItems.length === 0 ? (
         <div style={{ color: '#666', marginTop: '20px' }}>
           {filterId ? 'Элементы не найдены' : 'Нет выбранных элементов'}
@@ -314,7 +389,7 @@ const RightPane = () => {
               onScroll={handleScroll}
             >
               {displayItems.map((item) => (
-                <SortableItem key={item.id} id={item.id} item={item} />
+                <SortableItem key={item.id} id={item.id} item={item} onRemove={handleRemove} />
               ))}
               {selection.order.length > items.length && (
                 <div style={{ padding: '10px', textAlign: 'center', color: '#666' }}>

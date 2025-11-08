@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { listItems, getSelection, getItemsByIds } from './memoryStore.js';
+import { listItems, getSelection, getItemsByIds, removeFromSelection } from './memoryStore.js';
 import { initializeBatching, enqueueAdd, updateSelection, stopBatching } from './queue.js';
 
 dotenv.config();
@@ -14,7 +14,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -213,6 +212,42 @@ app.post('/api/selection/update', (req, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('Error in POST /api/selection/update:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
+
+app.post('/api/selection/remove', (req, res) => {
+  try {
+    const { ids } = req.body;
+    
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({ 
+        error: 'ids must be an array',
+        code: 'INVALID_INPUT'
+      });
+    }
+
+    const invalidIds = ids.filter(id => typeof id !== 'number' || isNaN(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({ 
+        error: 'All ids must be valid numbers',
+        code: 'INVALID_IDS',
+        invalidIds
+      });
+    }
+
+    const result = removeFromSelection(ids);
+    res.json({ 
+      ok: true, 
+      removed: result.removed, 
+      selectedIds: result.selectedIds, 
+      order: result.order 
+    });
+  } catch (error) {
+    console.error('Error in POST /api/selection/remove:', error);
     res.status(500).json({ 
       error: 'Internal server error',
       code: 'INTERNAL_ERROR'

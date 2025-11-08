@@ -2,9 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { FixedSizeList } from 'react-window';
 import { getItems } from '../api';
 
-/**
- * Компонент виртуализированного списка с infinite scroll
- */
 const InfiniteList = ({ onItemSelect, filterId }) => {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
@@ -16,7 +13,6 @@ const InfiniteList = ({ onItemSelect, filterId }) => {
   const ITEM_HEIGHT = 50;
   const LIMIT = 50;
 
-  // Загрузка данных
   const loadItems = useCallback(async (offset = 0, append = false) => {
     if (loadingRef.current) return;
     
@@ -45,22 +41,18 @@ const InfiniteList = ({ onItemSelect, filterId }) => {
     }
   }, [filterId]);
 
-  // Загрузка при изменении фильтра
   useEffect(() => {
     setItems([]);
     setHasMore(true);
     loadItems(0, false);
   }, [filterId, loadItems]);
 
-  // Обработка отрисовки элементов для infinite scroll
   const onItemsRendered = useCallback(({ visibleStopIndex }) => {
-    // Загружаем следующую страницу, когда видим последние элементы
     if (visibleStopIndex >= items.length - 5 && hasMore && !loadingRef.current) {
       loadItems(items.length, true);
     }
   }, [items.length, hasMore, loadItems]);
 
-  // Рендер элемента списка
   const Row = ({ index, style }) => {
     const item = items[index];
     if (!item) return null;

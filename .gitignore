@@ -4,11 +4,12 @@ node_modules/
 .pnp.js
 
 # Testing
-/coverage
+coverage/
+*.lcov
 
 # Production
-/build
-/dist
+build/
+dist/
 
 # Misc
 .DS_Store
@@ -36,4 +37,15 @@ lerna-debug.log*
 
 # OS
 Thumbs.db
+.DS_Store
 
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# Package manager lock files (optional - uncomment if needed)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

@@ -220,5 +220,131 @@ describe('API Integration Tests', () => {
       expect(response.body.order.length).toBeGreaterThanOrEqual(0);
     });
   });
+
+  describe('POST /api/selection/remove', () => {
+    it('should remove selected ids and return updated selection', async () => {
+      // Сначала устанавливаем selection
+      const selectedIds = [1, 2, 3];
+      const order = [2, 1, 3];
+
+      await request(app)
+        .post('/api/selection/update')
+        .send({ selectedIds, order })
+        .expect(200);
+
+      // Ждем коммита
+      await new Promise(resolve => setTimeout(resolve, 1100));
+
+      // Удаляем элемент
+      const removeResponse = await request(app)
+        .post('/api/selection/remove')
+        .send({ ids: [2] })
+        .expect(200);
+
+      expect(removeResponse.body).toHaveProperty('ok', true);
+      expect(removeResponse.body).toHaveProperty('removed');
+      expect(removeResponse.body).toHaveProperty('selectedIds');
+      expect(removeResponse.body).toHaveProperty('order');
+      
+      expect(removeResponse.body.removed).toEqual([2]);
+      expect(removeResponse.body.selectedIds).not.toContain(2);
+      expect(removeResponse.body.order).not.toContain(2);
+      expect(removeResponse.body.selectedIds).toEqual(expect.arrayContaining([1, 3]));
+    });
+
+    it('should be idempotent - repeated removal should not break order', async () => {
+      // Устанавливаем selection
+      const selectedIds = [10, 20, 30];
+      const order = [30, 10, 20];
+
+      await request(app)
+        .post('/api/selection/update')
+        .send({ selectedIds, order })
+        .expect(200);
+
+      await new Promise(resolve => setTimeout(resolve, 1100));
+
+      // Первое удаление
+      const firstRemove = await request(app)
+        .post('/api/selection/remove')
+        .send({ ids: [20] })
+        .expect(200);
+
+      expect(firstRemove.body.removed).toEqual([20]);
+
+      // Повторное удаление того же id
+      const secondRemove = await request(app)
+        .post('/api/selection/remove')
+        .send({ ids: [20] })
+        .expect(200);
+
+      expect(secondRemove.body.removed).toEqual([]);
+      expect(secondRemove.body.selectedIds).toEqual(firstRemove.body.selectedIds);
+      expect(secondRemove.body.order).toEqual(firstRemove.body.order);
+    });
+
+    it('should handle removal of non-existent ids gracefully', async () => {
+      // Устанавливаем selection
+      await request(app)
+        .post('/api/selection/update')
+        .send({ selectedIds: [1, 2, 3], order: [1, 2, 3] })
+        .expect(200);
+
+      await new Promise(resolve => setTimeout(resolve, 1100));
+
+      // Пытаемся удалить несуществующий id
+      const response = await request(app)
+        .post('/api/selection/remove')
+        .send({ ids: [999] })
+        .expect(200);
+
+      expect(response.body.ok).toBe(true);
+      expect(response.body.removed).toEqual([]);
+    });
+
+    it('should reject invalid input', async () => {
+      const response = await request(app)
+        .post('/api/selection/remove')
+        .send({ ids: 'not-an-array' })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.code).toBe('INVALID_INPUT');
+    });
+
+    it('should reject invalid ids', async () => {
+      const response = await request(app)
+        .post('/api/selection/remove')
+        .send({ ids: [1, 'invalid', 3] })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.code).toBe('INVALID_IDS');
+    });
+
+    it('should remove multiple ids at once', async () => {
+      // Устанавливаем selection
+      await request(app)
+        .post('/api/selection/update')
+        .send({ selectedIds: [1, 2, 3, 4, 5], order: [5, 4, 3, 2, 1] })
+        .expect(200);
+
+      await new Promise(resolve => setTimeout(resolve, 1100));
+
+      // Удаляем несколько элементов
+      const response = await request(app)
+        .post('/api/selection/remove')
+        .send({ ids: [2, 4] })
+        .expect(200);
+
+      expect(response.body.ok).toBe(true);
+      expect(response.body.removed).toEqual(expect.arrayContaining([2, 4]));
+      expect(response.body.selectedIds).not.toContain(2);
+      expect(response.body.selectedIds).not.toContain(4);
+      expect(response.body.order).not.toContain(2);
+      expect(response.body.order).not.toContain(4);
+      expect(response.body.selectedIds).toEqual(expect.arrayContaining([1, 3, 5]));
+    });
+  });
 });
 

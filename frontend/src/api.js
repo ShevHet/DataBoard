@@ -82,6 +82,13 @@ export const updateSelection = async (selectedIds, order) => {
   return response.data;
 };
 
+export const removeFromSelection = async (ids) => {
+  const response = await api.post('/selection/remove', {
+    ids,
+  });
+  return response.data;
+};
+
 export const healthCheck = async () => {
   const response = await api.get('/health');
   return response.data;

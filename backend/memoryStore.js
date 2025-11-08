@@ -147,3 +147,39 @@ export function updateSelection(selectedIds, order) {
   selection.order = [...order];
 }
 
+export function removeFromSelection(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return {
+      removed: [],
+      selectedIds: [...selection.selectedIds],
+      order: [...selection.order]
+    };
+  }
+
+  const removed = [];
+  const selectedIdsSet = new Set(selection.selectedIds);
+  const orderArray = [...selection.order];
+
+  for (const id of ids) {
+    if (selectedIdsSet.has(id)) {
+      selectedIdsSet.delete(id);
+      removed.push(id);
+    }
+  }
+
+  const newOrder = orderArray.filter(id => !ids.includes(id));
+
+  selection.selectedIds = Array.from(selectedIdsSet);
+  selection.order = newOrder;
+
+  if (removed.length > 0) {
+    console.log(`[removeFromSelection] Removed ${removed.length} ids: [${removed.join(', ')}]`);
+  }
+
+  return {
+    removed,
+    selectedIds: [...selection.selectedIds],
+    order: [...selection.order]
+  };
+}
+
